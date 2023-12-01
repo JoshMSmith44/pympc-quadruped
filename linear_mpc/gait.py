@@ -13,11 +13,11 @@ class Gait(Enum):
     num_segment: 
     '''
 
-    STANDING = 'standing', 16, np.array([0, 0, 0, 0]), np.array([16, 16, 16, 16])
+    #STANDING = 'standing', 16, np.array([0, 0, 0, 0]), np.array([16, 16, 16, 16])
     TROTTING16 = 'trotting', 16, np.array([0, 8, 8, 0]), np.array([8, 8, 8, 8])
     TROTTING10 = 'trotting', 10, np.array([0, 5, 5, 0]), np.array([5, 5, 5, 5])
-    JUMPING16 = 'jumping', 16, np.array([0, 0, 0, 0]), np.array([4, 4, 4, 4])
-    # BOUNDING8 = 'bounding', 8, np.array([4, 4, 0, 0]), np.array([4, 4, 4, 4])
+    #JUMPING16 = 'jumping', 16, np.array([0, 0, 0, 0]), np.array([4, 4, 4, 4])
+    BOUNDING8 = 'bounding', 8, np.array([4, 4, 0, 0]), np.array([4, 4, 4, 4])
     PACING16 = 'pacing', 16, np.array([8, 0, 8, 0]), np.array([8, 8, 8, 8])
     PACING10 = 'pacing', 10, np.array([5, 0, 5, 0]), np.array([5, 5, 5, 5])
 

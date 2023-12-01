@@ -173,15 +173,23 @@ def main():
     predictive_controller = ModelPredictiveController(LinearMpcConfig, AliengoConfig)
     leg_controller = LegController(robot_config.Kp_swing, robot_config.Kd_swing)
 
-    gait = Gait.TROTTING10
+    #gait = Gait.TROTTING10
+    gait_list = list(e for e in Gait)
+    gait = gait_list[0]
     swing_foot_trajs = [SwingFootTrajectoryGenerator(leg_idx) for leg_idx in range(4)]
 
-    vel_base_des = np.array([1.2, 0., 0.])
+    vel_base_des =np.array([1.0, 0., 0.]) #np.array([1.2, 0., 0.])
     yaw_turn_rate_des = 0.
 
     iter_counter = 0
 
+    gait_switch_iter = iter_counter + np.random.randint(low = 500, high = 1200)
     while True:
+
+        if iter_counter == gait_switch_iter:
+            print("######################################### Just Switched ##############################################")
+            gait_switch_iter = iter_counter + np.random.randint(low = 500, high = 1200)
+            gait = gait_list[np.random.randint(0, len(gait_list))]
 
         if not STATE_ESTIMATION:
             data = get_true_simulation_data(sim)
