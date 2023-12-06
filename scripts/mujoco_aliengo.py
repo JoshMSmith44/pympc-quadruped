@@ -155,7 +155,7 @@ def initialize_robot(sim, viewer, robot_config, robot_data, model, get_height_at
         sim.step()
         viewer.render()
 
-def create_stairs(model, num_stairs, total_height, hfield_rows = 400, hfield_cols = 800,hfield_size = (12, 6, 1)):
+def create_stairs(model, num_stairs, total_height, hfield_rows = 400, hfield_cols = 800,hfield_size = (12, 6, 10)):
     meter_to_index_scale = (hfield_size[0] * 2) / hfield_cols
     starting_x = 2
     stair_x_diff = (hfield_size[0] * 2 - starting_x) / num_stairs
@@ -168,11 +168,11 @@ def create_stairs(model, num_stairs, total_height, hfield_rows = 400, hfield_col
         x_start_index = (int)(stair_x_start / meter_to_index_scale)
         x_end_index = (int)(stair_x_end / meter_to_index_scale)
 
-        height_data[:, x_start_index : x_end_index] = stair_height
+        height_data[:, x_start_index : x_end_index] = stair_height / hfield_size[2]
 
     model.hfield_data[:] = height_data.flatten()
 
-def get_height_at_pos(x, y, model, hfield_rows = 400, hfield_cols = 800,hfield_size = (12, 6, 1), hfield_pos = (10, 0, 0), mean_over_area = False, mean_size = 0.5):
+def get_height_at_pos(x, y, model, hfield_rows = 400, hfield_cols = 800,hfield_size = (12, 6, 10), hfield_pos = (10, 0, 0), mean_over_area = False, mean_size = 0.5):
     meter_to_index_scale = (hfield_size[0] * 2) / hfield_cols
     point_x_displacement = x - (hfield_pos[0] - hfield_size[0])
     point_y_displacement = y - (hfield_pos[1] - hfield_size[1])
@@ -186,7 +186,7 @@ def get_height_at_pos(x, y, model, hfield_rows = 400, hfield_cols = 800,hfield_s
         z_val = np.mean(hfield_data[y_index - mean_size_index : y_index + mean_size_index, x_index - mean_size_index: x_index + mean_size_index])
     else:
         z_val = model.hfield_data[index]
-    return z_val  
+    return z_val * hfield_size[2] 
 
 def main():
     cur_path = os.path.dirname(__file__)

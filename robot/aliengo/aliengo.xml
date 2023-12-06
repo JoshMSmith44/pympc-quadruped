@@ -25,7 +25,7 @@
         <mesh name="thigh_mirror" file="thigh_mirror.stl"/>
         <mesh name="calf" file="calf.stl"/>
         <mesh name="thigh" file="thigh.stl"/>
-        <hfield name="height_map" nrow="400" ncol="800" size="12 6 1 0.1"/>
+        <hfield name="height_map" nrow="400" ncol="800" size="12 6 10 0.1"/>
     </asset>
 
     <asset>
