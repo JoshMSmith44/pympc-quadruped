@@ -14,7 +14,7 @@ from robot_configs import AliengoConfig
 
 class SwingFootTrajectoryGenerator():
 
-    def __init__(self, leg_id):
+    def __init__(self, leg_id, model, get_terrain_height):
         self.__load_parameters()
 
         self.__is_first_swing = True
@@ -23,6 +23,8 @@ class SwingFootTrajectoryGenerator():
 
         self.__footpos_init = np.zeros((3, 1), dtype=np.float32)
         self.__footpos_final = np.zeros((3, 1), dtype=np.float32)
+        self.model = model
+        self.get_terrain_height = get_terrain_height
 
     def __load_parameters(self):
         self.__dt_control = LinearMpcConfig.dt_control
@@ -41,7 +43,7 @@ class SwingFootTrajectoryGenerator():
                                  [total_swing_time]], dtype=np.float32)
 
         footpos_middle_time = (self.__footpos_init + self.__footpos_final) / 2
-        footpos_middle_time[2] = self.__swing_height
+        footpos_middle_time[2] = self.__footpos_final[2] + 0.2#self.__swing_height + 0.1
 
         # print(footpos_middle_time)
         footpos_break_points = np.hstack((
@@ -117,7 +119,8 @@ class SwingFootTrajectoryGenerator():
 
         world_footpos_final[0] += (0.5 * pos_base[2] / self.__gravity) * (vel_base[1] * yaw_turn_rate_des)
         world_footpos_final[1] += (0.5 * pos_base[2] / self.__gravity) * (-vel_base[0] * yaw_turn_rate_des)
-        world_footpos_final[2] = -0.0255 # TODO: what's this?
+        world_footpos_final[2] = self.get_terrain_height(world_footpos_final[0], world_footpos_final[1], self.model)
+        #world_footpos_final[2] = 0.5 # TODO: what's this?
         # world_footpos_final[2] = 0.0
         self.__set_final_foot_position(world_footpos_final)
 

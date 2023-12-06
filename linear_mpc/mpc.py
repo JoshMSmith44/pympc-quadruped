@@ -21,7 +21,7 @@ from robot_data import RobotData
 
 class ModelPredictiveController():
 
-    def __init__(self, mpc_config: LinearMpcConfig, robot_config: RobotConfig):        
+    def __init__(self, mpc_config: LinearMpcConfig, robot_config: RobotConfig, model, get_height_at_pos):        
         # state: x(t) = [\theta, p, \omega, \dot{p}, g], dim: 13
         self.num_state = 3 + 3 + 3 + 3 + 1
         # input: u(t) = [f1, f2, f3, f4], dim: 12
@@ -29,6 +29,8 @@ class ModelPredictiveController():
         
         self.is_initialized = False
         self.is_first_run = True
+        self.get_height_at_pos = get_height_at_pos
+        self.model = model
 
         self._load_parameters(mpc_config, robot_config)
     
@@ -157,7 +159,15 @@ class ModelPredictiveController():
         X_ref[2] = self.yaw_desired
         X_ref[3] = cur_xpos_desired
         X_ref[4] = cur_ypos_desired
-        X_ref[5::self.num_state] = self.com_height_des
+
+        #insert adaptive base height so that we can climb up and down terrain, now its adaptive
+        curr_mean_terrain_height_des = self.get_height_at_pos(self.xpos_base_desired, self.ypos_base_desired, self.model, mean_over_area = True, mean_size = 0.2)
+        curr_mean_terrain_height_cur = self.get_height_at_pos(self.current_state[3], self.current_state[4], self.model, mean_over_area = True, mean_size = 0.2)
+        curr_terrain_height = (curr_mean_terrain_height_des + curr_mean_terrain_height_cur) / 2.0
+        print("Curr Terrain Height", curr_terrain_height, curr_mean_terrain_height_cur, curr_mean_terrain_height_des)
+
+        X_ref[5::self.num_state] = self.com_height_des + curr_terrain_height
+
         X_ref[8::self.num_state] = yaw_turn_rate
         X_ref[9::self.num_state] = vel_base_des[0]
         X_ref[10::self.num_state] = vel_base_des[1]

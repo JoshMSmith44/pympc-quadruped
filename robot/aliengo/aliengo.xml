@@ -25,7 +25,7 @@
         <mesh name="thigh_mirror" file="thigh_mirror.stl"/>
         <mesh name="calf" file="calf.stl"/>
         <mesh name="thigh" file="thigh.stl"/>
-        <hfield name="height_map" nrow="160" ncol="1050" size="6.5 1.6 3 0.1"/>
+        <hfield name="height_map" nrow="400" ncol="800" size="12 6 1 0.1"/>
     </asset>
 
     <asset>
@@ -38,8 +38,8 @@
 
 
     <worldbody>
-        <geom name="floor" pos="0 0 0" euler="0 0 0" size="0 0 1" type="plane" material="plane" condim="3" conaffinity="1" contype="1" rgba="1 1 1 1"/>
-        <!-- <geom name="terrain" pos="0 0 -0.0002" euler="0 0 0" size="0 0 1" type="hfield" material="plane" hfield="height_map" rgba="0 0.0 1.0 1"/> -->
+        <!--<geom name="floor" pos="0 0 0" euler="0 0 0" size="0 0 1" type="plane" material="plane" condim="3" conaffinity="1" contype="1" rgba="1 1 1 1"/>-->
+        <geom name="terrain" pos="10 0 0.0002" euler="0 0 0" size="0 0 1" type="hfield" material="plane" hfield="height_map" rgba="0 0.0 1.0 1"/> 
         <light directional="true" diffuse=".8 .8 .8" pos="0 0 10" dir="0 0 -10"/>
         <camera name="track" mode="trackcom" pos="0 -2.3 1.6" xyaxes="1 0 0 0 0.707 0.707"/>
         <!--        <light directional="false" diffuse=".2 .2 .2" specular="0 0 0" pos="0 0 5" dir="0 0 -1" castshadow="false"/>-->
@@ -159,7 +159,7 @@
             <geom contype="1" condim="3" friction="0.7 0.005 0.0001" type="box" pos="2.7 0 0.75" size="0.15 2 0.75" rgba="0.9 0.9 0.9 1.0"/>
             <geom contype="1" condim="3" friction="0.7 0.005 0.0001" type="box" pos="3.6 0 0.75" size="0.75 2 0.75" rgba="0.9 0.9 0.9 1.0"/>
         </body>
-
+6.5
         <body name="staircase_sym" pos="11.45 3 0" euler="0 0 3.1415926">
             <inertial pos="0 0 0" quat="0 0 0 1" mass="1" diaginertia="0.033260231 0.16117211 0.17460442"/>
             <geom contype="1" condim="3" friction="0.7 0.005 0.0001" type="box" pos="0 0 0.075" size="0.15 2 0.075" rgba="0 0.0 1.0 1"/>

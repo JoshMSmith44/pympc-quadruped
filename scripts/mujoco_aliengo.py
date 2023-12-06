@@ -83,6 +83,7 @@ def get_true_simulation_data(sim):
         sim.data.get_body_xpos("RR_thigh")
     ]
 
+
     true_simulation_data = [
         pos_base, 
         vel_base, 
@@ -118,8 +119,8 @@ def get_simulated_sensor_data(sim):
     return simulated_sensor_data
 
 
-def initialize_robot(sim, viewer, robot_config, robot_data):
-    predictive_controller = ModelPredictiveController(LinearMpcConfig, AliengoConfig)
+def initialize_robot(sim, viewer, robot_config, robot_data, model, get_height_at_pos):
+    predictive_controller = ModelPredictiveController(LinearMpcConfig, AliengoConfig, model, get_height_at_pos)
     leg_controller = LegController(robot_config.Kp_swing, robot_config.Kd_swing)
     init_gait = Gait.STANDING
     vel_base_des = [0., 0., 0.]
@@ -154,12 +155,52 @@ def initialize_robot(sim, viewer, robot_config, robot_data):
         sim.step()
         viewer.render()
 
+def create_stairs(model, num_stairs, total_height, hfield_rows = 400, hfield_cols = 800,hfield_size = (12, 6, 1)):
+    meter_to_index_scale = (hfield_size[0] * 2) / hfield_cols
+    starting_x = 2
+    stair_x_diff = (hfield_size[0] * 2 - starting_x) / num_stairs
+    stair_z_diff = (total_height / num_stairs)
+    height_data = np.zeros((hfield_rows, hfield_cols))
+    for i in range(num_stairs):
+        stair_height = i * stair_z_diff
+        stair_x_start = starting_x + i * stair_x_diff
+        stair_x_end = starting_x + (i + 1) * stair_x_diff
+        x_start_index = (int)(stair_x_start / meter_to_index_scale)
+        x_end_index = (int)(stair_x_end / meter_to_index_scale)
+
+        height_data[:, x_start_index : x_end_index] = stair_height
+
+    model.hfield_data[:] = height_data.flatten()
+
+def get_height_at_pos(x, y, model, hfield_rows = 400, hfield_cols = 800,hfield_size = (12, 6, 1), hfield_pos = (10, 0, 0), mean_over_area = False, mean_size = 0.5):
+    meter_to_index_scale = (hfield_size[0] * 2) / hfield_cols
+    point_x_displacement = x - (hfield_pos[0] - hfield_size[0])
+    point_y_displacement = y - (hfield_pos[1] - hfield_size[1])
+    x_index = (int)(point_x_displacement / meter_to_index_scale)
+    y_index = (int)(point_y_displacement / meter_to_index_scale)
+    index = y_index * hfield_cols + x_index
+    z_val = 0
+    if mean_over_area:
+        mean_size_index = (int)(mean_size / meter_to_index_scale)
+        hfield_data = np.array(model.hfield_data[:]).reshape(hfield_rows, hfield_cols)
+        z_val = np.mean(hfield_data[y_index - mean_size_index : y_index + mean_size_index, x_index - mean_size_index: x_index + mean_size_index])
+    else:
+        z_val = model.hfield_data[index]
+    return z_val  
+
 def main():
     cur_path = os.path.dirname(__file__)
+    stairs = False
     mujoco_xml_path = os.path.join(cur_path, '../robot/aliengo/aliengo.xml')
+    if stairs:
+        mujoco_xml_path = os.path.join(cur_path, '../robot/aliengo/aliengo_stairs.xml')
     model = mujoco_py.load_model_from_path(mujoco_xml_path)
+    #create_stairs(model, 8, 0.6)
+    create_stairs(model, 30, 3)
     sim = mujoco_py.MjSim(model)
+    
     viewer = MjViewer(sim)
+    #viewer._scale = 0.001
 
     robot_config = AliengoConfig
 
@@ -170,13 +211,13 @@ def main():
     robot_data = RobotData(urdf_path, state_estimation=STATE_ESTIMATION)
     # initialize_robot(sim, viewer, robot_config, robot_data)
 
-    predictive_controller = ModelPredictiveController(LinearMpcConfig, AliengoConfig)
+    predictive_controller = ModelPredictiveController(LinearMpcConfig, AliengoConfig, model, get_height_at_pos)
     leg_controller = LegController(robot_config.Kp_swing, robot_config.Kd_swing)
 
-    #gait = Gait.TROTTING10
-    gait_list = list(e for e in Gait)
-    gait = gait_list[0]
-    swing_foot_trajs = [SwingFootTrajectoryGenerator(leg_idx) for leg_idx in range(4)]
+    gait = Gait.TROTTING10
+    #gait_list = list(e for e in Gait)
+    #gait = gait_list[0]
+    swing_foot_trajs = [SwingFootTrajectoryGenerator(leg_idx, model, get_height_at_pos) for leg_idx in range(4)]
 
     vel_base_des =np.array([1.0, 0., 0.]) #np.array([1.2, 0., 0.])
     yaw_turn_rate_des = 0.
@@ -186,10 +227,10 @@ def main():
     gait_switch_iter = iter_counter + np.random.randint(low = 500, high = 1200)
     while True:
 
-        if iter_counter == gait_switch_iter:
-            print("######################################### Just Switched ##############################################")
-            gait_switch_iter = iter_counter + np.random.randint(low = 500, high = 1200)
-            gait = gait_list[np.random.randint(0, len(gait_list))]
+        #if iter_counter == gait_switch_iter:
+        #    print("######################################### Just Switched ##############################################")
+        #    gait_switch_iter = iter_counter + np.random.randint(low = 500, high = 1200)
+        #    gait = gait_list[np.random.randint(0, len(gait_list))]
 
         if not STATE_ESTIMATION:
             data = get_true_simulation_data(sim)
