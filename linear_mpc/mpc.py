@@ -256,25 +256,43 @@ class ModelPredictiveController():
         angle_y = np.arctan(gradient_y)
 
         return angle_x, angle_y
-
     def _calculate_incline_max_forces(self, mass, gravity, mu, incline_angle_x, incline_angle_y):
+        # Inclination angles in radians
+        theta_x = np.radians(incline_angle_x)
+        theta_y = np.radians(incline_angle_y)
+
+        # Normal force calculation
+        normal_force = mass * gravity * np.cos(theta_x)
+
+        # Friction force in X direction, considering gravity component parallel to incline
+        friction_force_x = mu * (normal_force + (mass * gravity * np.sin(theta_x)))
+
+        # Normal force calculation for Y direction (if different from X)
+        normal_force_y = mass * gravity * np.cos(theta_y)
+
+        # Friction force in Y direction, considering gravity component parallel to incline
+        friction_force_y = mu * (normal_force_y + (mass * gravity * np.sin(theta_y)))
+
+        return friction_force_x, friction_force_y
+
+    """def _calculate_incline_max_forces(self, mass, gravity, mu, incline_angle_x, incline_angle_y):
         theta = (np.radians(incline_angle_x) + np.radians(incline_angle_y)) / 2
         normal_force = mass * gravity * np.cos(theta)
         friction_force = mu * normal_force # Assumes isotropic friction
 
         return friction_force, friction_force
-    
+    """
     def _generate_QP_constraints(self, gait_table):
         # friction cone constraint for one foot
-        delta = 0.1
+        delta = 0.4
         foot_angles = np.zeros((4, 2))
         for i, foot_pos in enumerate(self.__robot_data.pos_base_feet):
             angle_x, angle_y = self._get_incline_angle(foot_pos[0], foot_pos[1], delta, self.model, self.get_height_at_pos)
-            foot_angles[i]= [angle_x, angle_y]
+            #foot_angles[i]= [angle_x, angle_y]
 
-        for foot_index in range(4):
-            foot_angle_x, foot_angle_y = foot_angles[foot_index]
-            max_force_x, max_force_y = self._calculate_incline_max_forces(self.mass, self.gravity, self.mu, foot_angle_x, foot_angle_y)
+            #for foot_index in range(4):
+            #foot_angle_x, foot_angle_y = foot_angles[foot_index]
+            max_force_x, max_force_y = self._calculate_incline_max_forces(self.mass, self.gravity, self.mu, angle_x, angle_y)
 
             constraint_coef_matrix = np.array([
 
