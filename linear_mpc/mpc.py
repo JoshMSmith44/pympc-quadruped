@@ -245,9 +245,9 @@ class ModelPredictiveController():
         return qp_H, qp_g
 
     def _get_incline_angle(self, x, y, delta, model, get_height_at_pos):
-        height_center = get_height_at_pos(x, y, model)
-        height_x = get_height_at_pos(x + delta, y, model)
-        height_y = get_height_at_pos(x, y + delta, model)
+        height_center = self.get_height_at_pos(x, y, model)
+        height_x = self.get_height_at_pos(x + delta, y, model)
+        height_y = self.get_height_at_pos(x, y + delta, model)
 
         gradient_x = (height_x - height_center) / delta
         gradient_y = (height_y - height_center) / delta
@@ -267,12 +267,13 @@ class ModelPredictiveController():
     def _generate_QP_constraints(self, gait_table):
         # friction cone constraint for one foot
         delta = 0.1
+        foot_angles = np.zeros((4, 2))
         for i, foot_pos in enumerate(self.__robot_data.pos_base_feet):
-            angle_x, angle_y = self._get_incline_angle(foot_pos[0], foot_pos[1], delta, self.model, get_height_at_pos)
+            angle_x, angle_y = self._get_incline_angle(foot_pos[0], foot_pos[1], delta, self.model, self.get_height_at_pos)
             foot_angles[i]= [angle_x, angle_y]
 
         for foot_index in range(4):
-            foot_angle_x, foot_angle_y = foot_angles_degrees[foot_index]
+            foot_angle_x, foot_angle_y = foot_angles[foot_index]
             max_force_x, max_force_y = self._calculate_incline_max_forces(self.mass, self.gravity, self.mu, foot_angle_x, foot_angle_y)
 
             constraint_coef_matrix = np.array([
