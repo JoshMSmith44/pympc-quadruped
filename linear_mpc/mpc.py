@@ -243,16 +243,46 @@ class ModelPredictiveController():
         qp_g = 2 * Su.T @ self.Qbar @ (Sx @ xt - Xref)
 
         return qp_H, qp_g
+
+    def get_incline_angle(x, y, delta, model, get_height_at_pos):
+        height_center = get_height_at_pos(x, y, model)
+        height_x = get_height_at_pos(x + delta, y, model)
+        height_y = get_height_at_pos(x, y + delta, model)
+
+        gradient_x = (height_x - height_center) / delta
+        gradient_y = (height_y - height_center) / delta
+
+        angle_x = np.arctan(gradient_x)
+        angle_y = np.arctan(gradient_y)
+
+        return angle_x, angle_y
+
+    def calculate_incline_max_forces(mass, gravity, mu, incline_angle_x, incline_angle_y):
+        theta = (np.radians(incline_angle_x) + np.radians(incline_angle_y)) / 2
+        normal_force = mass * gravity * np.cos(theta)
+        friction_force = mu * normal_force # Assumes isotropic friction
+
+        return friction_force, friction_force
     
     def _generate_QP_constraints(self, gait_table):
         # friction cone constraint for one foot
-        constraint_coef_matrix = np.array([
-            [ 1,  0, self.mu],
-            [-1,  0, self.mu],
-            [ 0,  1, self.mu],
-            [ 0, -1, self.mu],
-            [ 0,  0,       1]
-        ], dtype=np.float32)
+
+        for i, foot_pos in enumerate(robot_data.pos_base_feet):
+            angle_x, angle_y = get_inclination_angle(foot_pos[0], foot_pos[1], delta, model, get_height_at_pos)
+            foot_angles[i]= [angle_x, angle_y]
+
+        for foot_index in range(4):
+            foot_angle_x, foot_angle_y = foot_angles_degrees[foot_index]
+            max_force_x, max_force_y = calculate_incline_max_forces(self.mass, self.gravity, self.mu, foot_angle_x, foot_angle_y)
+
+            constraint_coef_matrix = np.array([
+
+                    [ 1,  0, max_force_x],
+                    [-1,  0, max_force_x],
+                    [ 0,  1, max_force_y],
+                    [ 0, -1, max_force_y],
+                    [ 0,  0,       1]
+            ], dtype=np.float32)
         qp_C = np.kron(np.identity(4 * self.horizon, dtype=np.float32), constraint_coef_matrix)
         
         C_lb = np.zeros(4 * 5 * self.horizon, dtype=np.float32)

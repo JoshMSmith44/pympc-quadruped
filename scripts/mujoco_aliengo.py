@@ -277,6 +277,13 @@ def main():
         gait.set_iteration(predictive_controller.iterations_between_mpc, iter_counter)
         swing_states = gait.get_swing_state()
         gait_table = gait.get_gait_table()
+        
+        """
+        foot_angles = np.zeros((4, 2))
+        for i, foot_pos in enumerate(robot_data.pos_base_feet):
+            angle_x, angle_y = get_inclination_angle(foot_pos[0], foot_pos[1], delta, model, get_height_at_pos)
+            foot_angles[i]= [angle_x, angle_y] */
+        """
 
         predictive_controller.update_robot_state(robot_data)
 
