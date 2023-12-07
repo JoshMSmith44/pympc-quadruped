@@ -1,5 +1,6 @@
 import os
 import sys
+import matplotlib.pyplot as plt
 sys.path.append(os.path.join(os.path.dirname(__file__), '../config'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '../linear_mpc'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '../utils/'))
@@ -172,7 +173,20 @@ def create_stairs(model, num_stairs, total_height, hfield_rows = 400, hfield_col
 
     model.hfield_data[:] = height_data.flatten()
 
-def get_height_at_pos(x, y, model, hfield_rows = 400, hfield_cols = 800,hfield_size = (12, 6, 10), hfield_pos = (10, 0, 0), mean_over_area = False, mean_size = 0.5):
+def create_inclined_plane(model, total_width, total_height, hfield_rows = 400, hfield_cols = 800,hfield_size = (12, 6, 10)):
+    meter_to_index_scale = (hfield_size[0] * 2) / hfield_cols
+    starting_x = 2
+    starting_index = (int)(starting_x / meter_to_index_scale)
+    ending_x = starting_x + total_width
+    ending_index = (int)(ending_x / meter_to_index_scale)
+    height_data = np.zeros((hfield_rows, hfield_cols))
+    for i in range(ending_index - starting_index):
+        height = (i / (ending_index - starting_index)) * total_height
+        height_data[:, i + starting_index] = height / hfield_size[2]
+
+    model.hfield_data[:] = height_data.flatten()
+
+def get_height_at_pos(x, y, model, hfield_rows = 400, hfield_cols = 800,hfield_size = (12, 6, 10), hfield_pos = (11, 0, 0), mean_over_area = False, mean_size = 0.5):
     meter_to_index_scale = (hfield_size[0] * 2) / hfield_cols
     point_x_displacement = x - (hfield_pos[0] - hfield_size[0])
     point_y_displacement = y - (hfield_pos[1] - hfield_size[1])
@@ -188,6 +202,19 @@ def get_height_at_pos(x, y, model, hfield_rows = 400, hfield_cols = 800,hfield_s
         z_val = model.hfield_data[index]
     return z_val * hfield_size[2] 
 
+def get_deriv_mat(model, hfield_rows = 400, hfield_cols = 800,hfield_size = (12, 6, 10), hfield_pos = (11, 0, 0), mean_over_area = False, mean_size = 0.5):
+    meter_to_index_scale = (hfield_size[0] * 2) / hfield_cols
+    hfield_data = np.array(model.hfield_data[:]).reshape(hfield_rows, hfield_cols)
+    hfield_row_deriv = (hfield_data[2:] - hfield_data[0:-2]) ** 2
+    hfield_col_deriv = (hfield_data[:, 2:] - hfield_data[:, 0:-2]) ** 2
+    hfield_deriv = np.zeros_like(hfield_data)
+    hfield_deriv[1:-1] += hfield_row_deriv
+    hfield_deriv[:, 1:-1] += hfield_col_deriv
+    hfield_deriv = np.sqrt(hfield_deriv) / meter_to_index_scale
+    plt.matshow(hfield_deriv)
+    plt.show()
+    return hfield_deriv
+
 def main():
     cur_path = os.path.dirname(__file__)
     stairs = False
@@ -195,8 +222,9 @@ def main():
     if stairs:
         mujoco_xml_path = os.path.join(cur_path, '../robot/aliengo/aliengo_stairs.xml')
     model = mujoco_py.load_model_from_path(mujoco_xml_path)
-    #create_stairs(model, 8, 0.6)
-    create_stairs(model, 30, 3)
+    #create_stairs(model, 80, 8)
+    create_inclined_plane(model, 8, 4)
+    get_deriv_mat(model)
     sim = mujoco_py.MjSim(model)
     
     viewer = MjViewer(sim)
@@ -214,12 +242,12 @@ def main():
     predictive_controller = ModelPredictiveController(LinearMpcConfig, AliengoConfig, model, get_height_at_pos)
     leg_controller = LegController(robot_config.Kp_swing, robot_config.Kd_swing)
 
-    gait = Gait.TROTTING10
+    gait = Gait.TROTTING16
     #gait_list = list(e for e in Gait)
     #gait = gait_list[0]
     swing_foot_trajs = [SwingFootTrajectoryGenerator(leg_idx, model, get_height_at_pos) for leg_idx in range(4)]
 
-    vel_base_des =np.array([1.0, 0., 0.]) #np.array([1.2, 0., 0.])
+    vel_base_des = 0.3 * np.array([1.0, 0., 0.]) #np.array([1.2, 0., 0.])
     yaw_turn_rate_des = 0.
 
     iter_counter = 0
