@@ -42,19 +42,46 @@ class SwingFootTrajectoryGenerator():
                                  [total_swing_time / 2.0],
                                  [total_swing_time]], dtype=np.float32)
 
-        footpos_middle_time = (self.__footpos_init + self.__footpos_final) / 2
-        footpos_middle_time[2] = self.__footpos_final[2] + 0.2#self.__swing_height + 0.1
+        four_point_traj = False
+        if four_point_traj:
+            break_points = np.array([[0.],
+                                    [total_swing_time / 3.0],
+                                    [2.0 * total_swing_time / 3.0],
+                                    [total_swing_time]], dtype=np.float32)
+            footpos_middle_time_1 = (self.__footpos_init)
+            footpos_middle_time_1[2] = self.__footpos_final[2] 
+            footpos_middle_time_2 = (self.__footpos_final)
+            footpos_middle_time_2[2] = self.__footpos_final[2] + self.__swing_height
 
-        # print(footpos_middle_time)
-        footpos_break_points = np.hstack((
-            self.__footpos_init.reshape(3, 1),
-            footpos_middle_time.reshape(3, 1),
-            self.__footpos_final.reshape(3, 1)
-        ))
+            # print(footpos_middle_time)
+            footpos_break_points = np.hstack((
+                self.__footpos_init.reshape(3, 1),
+                footpos_middle_time_1.reshape(3, 1),
+                footpos_middle_time_2.reshape(3, 1),
+                self.__footpos_final.reshape(3, 1)
+            ))
 
-        vel_break_points = np.zeros((3, 3), dtype=np.float32)
+            vel_break_points = np.zeros((3, 4), dtype=np.float32)
 
-        swing_traj = PiecewisePolynomial.CubicHermite(break_points, footpos_break_points, vel_break_points)
+            swing_traj = PiecewisePolynomial.CubicHermite(break_points, footpos_break_points, vel_break_points)
+        else:
+            break_points = np.array([[0.],
+                                    [total_swing_time / 2.0],
+                                    [total_swing_time]], dtype=np.float32)
+            footpos_middle_time = (self.__footpos_init + self.__footpos_final) / 2
+            footpos_middle_time[2] = self.__footpos_final[2] + self.__swing_height
+            print("Swing height", self.__swing_height)
+
+            # print(footpos_middle_time)
+            footpos_break_points = np.hstack((
+                self.__footpos_init.reshape(3, 1),
+                footpos_middle_time.reshape(3, 1),
+                self.__footpos_final.reshape(3, 1)
+            ))
+
+            vel_break_points = np.zeros((3, 3), dtype=np.float32)
+
+            swing_traj = PiecewisePolynomial.CubicHermite(break_points, footpos_break_points, vel_break_points)
 
         # print(cur_swing_time)
         pos_swingfoot = swing_traj.value(cur_swing_time)
