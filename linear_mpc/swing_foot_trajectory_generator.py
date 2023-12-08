@@ -14,7 +14,7 @@ from robot_configs import AliengoConfig
 
 class SwingFootTrajectoryGenerator():
 
-    def __init__(self, leg_id, model, get_terrain_height):
+    def __init__(self, leg_id, model, get_terrain_height, deriv_mat, get_closest_safe_spot):
         self.__load_parameters()
 
         self.__is_first_swing = True
@@ -25,6 +25,8 @@ class SwingFootTrajectoryGenerator():
         self.__footpos_final = np.zeros((3, 1), dtype=np.float32)
         self.model = model
         self.get_terrain_height = get_terrain_height
+        self.deriv_mat = deriv_mat
+        self.get_closest_safe_spot = get_closest_safe_spot
 
     def __load_parameters(self):
         self.__dt_control = LinearMpcConfig.dt_control
@@ -45,12 +47,12 @@ class SwingFootTrajectoryGenerator():
         four_point_traj = False
         if four_point_traj:
             break_points = np.array([[0.],
-                                    [total_swing_time / 3.0],
-                                    [2.0 * total_swing_time / 3.0],
+                                    [1.5 * total_swing_time / 3.0],
+                                    [2.2 * total_swing_time / 3.0],
                                     [total_swing_time]], dtype=np.float32)
             footpos_middle_time_1 = (self.__footpos_init)
-            footpos_middle_time_1[2] = self.__footpos_final[2] 
-            footpos_middle_time_2 = (self.__footpos_final)
+            footpos_middle_time_1[2] = self.__swing_height
+            footpos_middle_time_2 = (self.__footpos_init + self.__footpos_final) / 2
             footpos_middle_time_2[2] = self.__footpos_final[2] + self.__swing_height
 
             # print(footpos_middle_time)
@@ -66,11 +68,12 @@ class SwingFootTrajectoryGenerator():
             swing_traj = PiecewisePolynomial.CubicHermite(break_points, footpos_break_points, vel_break_points)
         else:
             break_points = np.array([[0.],
-                                    [total_swing_time / 2.0],
+                                    [total_swing_time * 1.0 / 2.0],
                                     [total_swing_time]], dtype=np.float32)
             footpos_middle_time = (self.__footpos_init + self.__footpos_final) / 2
             footpos_middle_time[2] = self.__footpos_final[2] + self.__swing_height
-            print("Swing height", self.__swing_height)
+            #footpos_middle_time = (self.__footpos_init * 1.3 + self.__footpos_final * 0.7) / 2
+            #footpos_middle_time[2] = self.__footpos_final[2] + self.__swing_height
 
             # print(footpos_middle_time)
             footpos_break_points = np.hstack((
@@ -109,7 +112,7 @@ class SwingFootTrajectoryGenerator():
         base_vel_swingfoot_des = base_R_world @ (vel_swingfoot_des - vel_base)
 
         return base_pos_swingfoot_des, base_vel_swingfoot_des
-
+    
     def set_foot_placement(
         self, 
         robot_data: RobotData, 
@@ -146,7 +149,12 @@ class SwingFootTrajectoryGenerator():
 
         world_footpos_final[0] += (0.5 * pos_base[2] / self.__gravity) * (vel_base[1] * yaw_turn_rate_des)
         world_footpos_final[1] += (0.5 * pos_base[2] / self.__gravity) * (-vel_base[0] * yaw_turn_rate_des)
+        new_x, new_y = self.get_closest_safe_spot(np.array(world_footpos_final), self.deriv_mat, threshold=0.2)
+        #adjusted_diff = np.sqrt((world_footpos_final[0] - new_x) ** 2 + (world_footpos_final[1] - new_y) ** 2)
+        world_footpos_final[0] = new_x
+        world_footpos_final[1] = new_y
         world_footpos_final[2] = self.get_terrain_height(world_footpos_final[0], world_footpos_final[1], self.model)
+        world_footpos_final[2] += 0.02
         #world_footpos_final[2] = 0.5 # TODO: what's this?
         # world_footpos_final[2] = 0.0
         self.__set_final_foot_position(world_footpos_final)

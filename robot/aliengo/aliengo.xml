@@ -39,7 +39,7 @@
 
     <worldbody>
         <!--<geom name="floor" pos="0 0 0" euler="0 0 0" size="0 0 1" type="plane" material="plane" condim="3" conaffinity="1" contype="1" rgba="1 1 1 1"/>-->
-        <geom name="terrain" pos="11 0 0.0002" euler="0 0 0" size="0 0 1" type="hfield" material="plane" hfield="height_map" rgba="0 0.0 1.0 1"/> 
+        <geom name="terrain" pos="11 0 0.0002" euler="0 0 0" size="0 0 1" type="hfield" material="plane" hfield="height_map" rgba="0 0.0 1.0 1" friction="1.0"/> 
         <light directional="true" diffuse=".8 .8 .8" pos="0 0 10" dir="0 0 -10"/>
         <camera name="track" mode="trackcom" pos="0 -2.3 1.6" xyaxes="1 0 0 0 0.707 0.707"/>
         <!--        <light directional="false" diffuse=".2 .2 .2" specular="0 0 0" pos="0 0 5" dir="0 0 -1" castshadow="false"/>-->

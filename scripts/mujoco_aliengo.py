@@ -8,6 +8,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../utils/'))
 import mujoco_py
 from mujoco_py import MjViewer
 import numpy as np
+import cv2 #we are importing cv2 so we can dilate the safety_matrix
 
 from gait import Gait
 from leg_controller import LegController
@@ -202,7 +203,7 @@ def get_height_at_pos(x, y, model, hfield_rows = 400, hfield_cols = 800,hfield_s
         z_val = model.hfield_data[index]
     return z_val * hfield_size[2] 
 
-def get_deriv_mat(model, hfield_rows = 400, hfield_cols = 800,hfield_size = (12, 6, 10), hfield_pos = (11, 0, 0), mean_over_area = False, mean_size = 0.5):
+def get_deriv_mat(model, threshold = None, dilate_iters = 2, hfield_rows = 400, hfield_cols = 800,hfield_size = (12, 6, 10), hfield_pos = (11, 0, 0), mean_over_area = False, mean_size = 0.5):
     meter_to_index_scale = (hfield_size[0] * 2) / hfield_cols
     hfield_data = np.array(model.hfield_data[:]).reshape(hfield_rows, hfield_cols)
     hfield_row_deriv = (hfield_data[2:] - hfield_data[0:-2]) ** 2
@@ -211,9 +212,47 @@ def get_deriv_mat(model, hfield_rows = 400, hfield_cols = 800,hfield_size = (12,
     hfield_deriv[1:-1] += hfield_row_deriv
     hfield_deriv[:, 1:-1] += hfield_col_deriv
     hfield_deriv = np.sqrt(hfield_deriv) / meter_to_index_scale
-    plt.matshow(hfield_deriv)
-    plt.show()
-    return hfield_deriv
+    if threshold is not None:
+        binarized_safety_mat = (hfield_deriv > threshold).astype(np.uint8)
+        kernel = np.ones((3,3))
+        if dilate_iters > 0:
+            for i in range(dilate_iters):
+                binarized_safety_mat = cv2.dilate(binarized_safety_mat, kernel)
+        return (binarized_safety_mat.astype(np.float))
+    else:
+        return hfield_deriv
+
+def get_closest_safe_spot(footpos, safe_mat, threshold=0.1, hfield_rows = 400, hfield_cols = 800,hfield_size = (12, 6, 10), hfield_pos = (11, 0, 0) ):
+    x = footpos[0]
+    y = footpos[1]
+    meter_to_index_scale = (hfield_size[0] * 2) / hfield_cols
+    search_region_index = (int)(0.25 / meter_to_index_scale)
+    point_x_displacement = x - (hfield_pos[0] - hfield_size[0])
+    point_y_displacement = y - (hfield_pos[1] - hfield_size[1])
+    orig_x_index = (int)(point_x_displacement / meter_to_index_scale)
+    orig_y_index = (int)(point_y_displacement / meter_to_index_scale)
+    min_dist_valid = 999999999
+    min_valid_x_y = (orig_x_index, orig_y_index)
+    for i in range(search_region_index * 2 + 1):
+        rel_index_x = i - search_region_index
+        x_index = orig_x_index + rel_index_x
+        for j in range(search_region_index * 2 + 1):
+            rel_index_y = j - search_region_index
+            y_index = orig_y_index + rel_index_y
+            dist_away = np.sqrt(rel_index_x**2 + rel_index_y ** 2)
+            valid = safe_mat[y_index, x_index] < threshold 
+            if valid and dist_away < min_dist_valid:
+                min_dist_valid = dist_away
+                min_valid_x_y = (x_index + 0.5, y_index + 0.5)
+    #print("Min Dist Valid", min_dist_valid)
+    
+    x_m = (min_valid_x_y[0] * meter_to_index_scale) + (hfield_pos[0] - hfield_size[0])
+    y_m = y #(min_valid_x_y[1] * meter_to_index_scale) + (hfield_pos[1] - hfield_size[1])
+    if min_dist_valid < 1:
+        return x, y
+    #print("Double Check diff", np.sqrt((x_m - x) ** 2 + (y_m - y) ** 2))
+
+    return x_m, y_m
 
 def main():
     cur_path = os.path.dirname(__file__)
@@ -222,9 +261,8 @@ def main():
     if stairs:
         mujoco_xml_path = os.path.join(cur_path, '../robot/aliengo/aliengo_stairs.xml')
     model = mujoco_py.load_model_from_path(mujoco_xml_path)
-    #create_stairs(model, 80, 8)
-    create_inclined_plane(model, 8, 4)
-    get_deriv_mat(model)
+    create_stairs(model, 80, 8)
+    #create_inclined_plane(model, 8, 4)
     sim = mujoco_py.MjSim(model)
     
     viewer = MjViewer(sim)
@@ -239,16 +277,20 @@ def main():
     robot_data = RobotData(urdf_path, state_estimation=STATE_ESTIMATION)
     # initialize_robot(sim, viewer, robot_config, robot_data)
 
-    predictive_controller = ModelPredictiveController(LinearMpcConfig, AliengoConfig, model, get_height_at_pos)
+    deriv_mat = get_deriv_mat(model, threshold=0.2, dilate_iters=2)
+    print("max deriv", np.max(deriv_mat))
+    #plt.matshow(deriv_mat)
+    #plt.show()
+    predictive_controller = ModelPredictiveController(LinearMpcConfig, AliengoConfig, model, get_height_at_pos, desired_pitch = -0.4)
     leg_controller = LegController(robot_config.Kp_swing, robot_config.Kd_swing)
 
-    gait = Gait.TROTTING16
+    gait = Gait.TROTTING10
     #gait_list = list(e for e in Gait)
     #gait = gait_list[0]
-    swing_foot_trajs = [SwingFootTrajectoryGenerator(leg_idx, model, get_height_at_pos) for leg_idx in range(4)]
+    swing_foot_trajs = [SwingFootTrajectoryGenerator(leg_idx, model, get_height_at_pos, deriv_mat, get_closest_safe_spot) for leg_idx in range(4)]
 
-    vel_base_des = 0.3 * np.array([1.0, 0., 0.]) #np.array([1.2, 0., 0.])
-    yaw_turn_rate_des = 0.
+    vel_base_des = 0.8 * np.array([1.0, 0., 0.5]) #np.array([1.2, 0., 0.])
+    yaw_turn_rate_des = 0.0
 
     iter_counter = 0
 

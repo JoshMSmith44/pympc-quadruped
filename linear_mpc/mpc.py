@@ -21,7 +21,8 @@ from robot_data import RobotData
 
 class ModelPredictiveController():
 
-    def __init__(self, mpc_config: LinearMpcConfig, robot_config: RobotConfig, model, get_height_at_pos):        
+    def __init__(self, mpc_config: LinearMpcConfig, robot_config: RobotConfig, model, get_height_at_pos, desired_pitch = 0.0):        
+        self.desired_pitch = desired_pitch
         # state: x(t) = [\theta, p, \omega, \dot{p}, g], dim: 13
         self.num_state = 3 + 3 + 3 + 3 + 1
         # input: u(t) = [f1, f2, f3, f4], dim: 12
@@ -58,7 +59,7 @@ class ModelPredictiveController():
         if self.is_initialized == False:
             self.current_state = np.zeros(13, dtype=np.float32)
             self.roll_init = 0.0
-            self.pitch_init = 0.0
+            self.pitch_init = self.desired_pitch
             self.is_initialized = True
 
         self.__robot_data = robot_data
@@ -149,13 +150,15 @@ class ModelPredictiveController():
 
         # staturation for pitch and roll compensation
         self.roll_init = np.fmin(np.fmax(self.roll_init, -0.25), 0.25)
-        self.pitch_init = np.fmin(np.fmax(self.pitch_init, -0.25), 0.25)
+        #self.pitch_init = np.fmin(np.fmax(self.pitch_init, -0.25), 0.25)
+        self.pitch_init = np.fmin(np.fmax(self.pitch_init, self.desired_pitch-0.25), self.desired_pitch + 0.25)
         roll_comp = self.current_state[10] * self.roll_init
         pitch_comp = self.current_state[9] * self.pitch_init
 
         X_ref = np.zeros(self.num_state * self.horizon, dtype=np.float32)        
         X_ref[0::self.num_state] = roll_comp
-        X_ref[1::self.num_state] = pitch_comp
+#        X_ref[1::self.num_state] = pitch_comp
+        X_ref[1::self.num_state] = self.desired_pitch
         X_ref[2] = self.yaw_desired
         X_ref[3] = cur_xpos_desired
         X_ref[4] = cur_ypos_desired
