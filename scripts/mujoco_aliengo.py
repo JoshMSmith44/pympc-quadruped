@@ -215,6 +215,24 @@ def get_deriv_mat(model, hfield_rows = 400, hfield_cols = 800,hfield_size = (12,
     plt.show()
     return hfield_deriv
 
+def get_normal_at_pos(x, y, model, hfield_rows = 400, hfield_cols = 800,hfield_size = (12, 6, 10), hfield_pos = (11, 0, 0), mean_over_area = False, mean_size = 0.5):
+    meter_to_index_scale = (hfield_size[0] * 2) / hfield_cols
+    point_x_displacement = x - (hfield_pos[0] - hfield_size[0])
+    point_y_displacement = y - (hfield_pos[1] - hfield_size[1])
+    x_index = (int)(point_x_displacement / meter_to_index_scale)
+    y_index = (int)(point_y_displacement / meter_to_index_scale)
+    index = y_index * hfield_cols + x_index
+    z_val = model.hfield_data[index] * hfield_size[2]
+    index_2 = y_index * hfield_cols + (x_index + 1)
+    z_val_2 = model.hfield_data[index_2] * hfield_size[2]
+    index_3 = (y_index + 1) * hfield_cols + x_index
+    z_val_3 = model.hfield_data[index_3]* hfield_size[2]
+    vec_1 = np.array([meter_to_index_scale, 0, z_val_2 - z_val])
+    vec_2 = np.array([0, meter_to_index_scale, z_val_3 - z_val])
+    vec = np.cross(vec_1, vec_2)
+    norm_vec = vec / np.linalg.norm(vec)
+    return norm_vec
+
 def main():
     cur_path = os.path.dirname(__file__)
     stairs = False
@@ -223,7 +241,7 @@ def main():
         mujoco_xml_path = os.path.join(cur_path, '../robot/aliengo/aliengo_stairs.xml')
     model = mujoco_py.load_model_from_path(mujoco_xml_path)
     #create_stairs(model, 80, 8)
-    create_inclined_plane(model, 8, 4)
+    create_inclined_plane(model, 8, 3.6)
     get_deriv_mat(model)
     sim = mujoco_py.MjSim(model)
     
@@ -239,7 +257,7 @@ def main():
     robot_data = RobotData(urdf_path, state_estimation=STATE_ESTIMATION)
     # initialize_robot(sim, viewer, robot_config, robot_data)
 
-    predictive_controller = ModelPredictiveController(LinearMpcConfig, AliengoConfig, model, get_height_at_pos)
+    predictive_controller = ModelPredictiveController(LinearMpcConfig, AliengoConfig, model, get_height_at_pos, get_normal_at_pos)
     leg_controller = LegController(robot_config.Kp_swing, robot_config.Kd_swing)
 
     gait = Gait.TROTTING16
@@ -247,7 +265,7 @@ def main():
     #gait = gait_list[0]
     swing_foot_trajs = [SwingFootTrajectoryGenerator(leg_idx, model, get_height_at_pos) for leg_idx in range(4)]
 
-    vel_base_des = 0.3 * np.array([1.0, 0., 0.]) #np.array([1.2, 0., 0.])
+    vel_base_des = 0.7 * np.array([1.0, 0., 0.]) #np.array([1.2, 0., 0.])
     yaw_turn_rate_des = 0.
 
     iter_counter = 0

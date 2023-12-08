@@ -21,7 +21,7 @@ from robot_data import RobotData
 
 class ModelPredictiveController():
 
-    def __init__(self, mpc_config: LinearMpcConfig, robot_config: RobotConfig, model, get_height_at_pos):        
+    def __init__(self, mpc_config: LinearMpcConfig, robot_config: RobotConfig, model, get_height_at_pos, get_normal_at_pos):        
         # state: x(t) = [\theta, p, \omega, \dot{p}, g], dim: 13
         self.num_state = 3 + 3 + 3 + 3 + 1
         # input: u(t) = [f1, f2, f3, f4], dim: 12
@@ -31,6 +31,7 @@ class ModelPredictiveController():
         self.is_first_run = True
         self.get_height_at_pos = get_height_at_pos
         self.model = model
+        self.get_normal_at_pos = get_normal_at_pos
 
         self._load_parameters(mpc_config, robot_config)
     
@@ -256,6 +257,7 @@ class ModelPredictiveController():
         angle_y = np.arctan(gradient_y)
 
         return angle_x, angle_y
+    
     def _calculate_incline_max_forces(self, mass, gravity, mu, incline_angle_x, incline_angle_y):
         # Inclination angles in radians
         theta_x = np.radians(incline_angle_x)
@@ -286,24 +288,54 @@ class ModelPredictiveController():
         # friction cone constraint for one foot
         delta = 0.4
         foot_angles = np.zeros((4, 2))
-        for i, foot_pos in enumerate(self.__robot_data.pos_base_feet):
-            angle_x, angle_y = self._get_incline_angle(foot_pos[0], foot_pos[1], delta, self.model, self.get_height_at_pos)
+        cons_coef_list = []
+
+        #set whether use adaptive foot placement:
+        adaptive_foot_place = True
+        for i, foot_pos in enumerate(self.__robot_data.pos_feet):
+            #angle_x, angle_y = self._get_incline_angle(foot_pos[0], foot_pos[1], delta, self.model, self.get_height_at_pos)
             #foot_angles[i]= [angle_x, angle_y]
 
             #for foot_index in range(4):
             #foot_angle_x, foot_angle_y = foot_angles[foot_index]
-            max_force_x, max_force_y = self._calculate_incline_max_forces(self.mass, self.gravity, self.mu, angle_x, angle_y)
+            #max_force_x, max_force_y = self._calculate_incline_max_forces(self.mass, self.gravity, self.mu, angle_x, angle_y)
 
-            constraint_coef_matrix = np.array([
+            if adaptive_foot_place:
+                norm_vec = self.get_normal_at_pos(foot_pos[0], foot_pos[1], self.model)
+                print(norm_vec)
+                a = norm_vec[0]
+                b = norm_vec[1]
+                c = norm_vec[2]
+                u = self.mu
+                constraint_coef_matrix = np.array([
+                        [u*a, u*b + c, u*c - b],
+                        [u*a, u*b - c, u*c + b],
+                        [u*a+c, u*b, u*c - a],
+                        [u*a-c, u*b, u*c + a],
+                        [ 0,  0,       1]
+                ], dtype=np.float32)
+            else:
+                constraint_coef_matrix = np.array([
+                        [ 1,  0, self.mu],
+                        [-1,  0, self.mu],
+                        [ 0,  1, self.mu],
+                        [ 0, -1, self.mu],
+                        [ 0,  0,       1]
+                ], dtype=np.float32)
 
-                    [ 1,  0, max_force_x],
-                    [-1,  0, max_force_x],
-                    [ 0,  1, max_force_y],
-                    [ 0, -1, max_force_y],
-                    [ 0,  0,       1]
-            ], dtype=np.float32)
-        qp_C = np.kron(np.identity(4 * self.horizon, dtype=np.float32), constraint_coef_matrix)
-        
+            cons_coef_list.append(constraint_coef_matrix)
+
+        cons_coef_shape = cons_coef_list[0].shape
+        cons_coef = np.zeros((cons_coef_list[0].shape[0] * 4,cons_coef_list[0].shape[1] * 4 ))
+        cons_coef[0:cons_coef_shape[0], 0:cons_coef_shape[1]] = cons_coef_list[0]
+        cons_coef[cons_coef_shape[0]: cons_coef_shape[0] * 2,cons_coef_shape[1]:cons_coef_shape[1] * 2] = cons_coef_list[1]
+        cons_coef[cons_coef_shape[0] * 2: cons_coef_shape[0] * 3,cons_coef_shape[1] * 2:cons_coef_shape[1] * 3] = cons_coef_list[2]
+        cons_coef[cons_coef_shape[0] * 3:,cons_coef_shape[1] * 3:] = cons_coef_list[3]
+
+        #I believe this alternate method is working correctly
+        qp_C = np.kron(np.identity(self.horizon, dtype=np.float32), cons_coef)
+        #qp_C = np.kron(np.identity(4 * self.horizon, dtype=np.float32), constraint_coef_matrix)
+
         C_lb = np.zeros(4 * 5 * self.horizon, dtype=np.float32)
         C_ub = np.zeros(4 * 5 * self.horizon, dtype=np.float32)
         k = 0
