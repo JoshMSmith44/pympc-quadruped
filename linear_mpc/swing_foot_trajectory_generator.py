@@ -148,7 +148,7 @@ class SwingFootTrajectoryGenerator():
         world_footpos_final[1] += (0.5 * pos_base[2] / self.__gravity) * (-vel_base[0] * yaw_turn_rate_des)
         world_footpos_final[2] = self.get_terrain_height(world_footpos_final[0], world_footpos_final[1], self.model)
         #world_footpos_final[2] = 0.5 # TODO: what's this?
-        # world_footpos_final[2] = 0.0
+        world_footpos_final[2] += 0.02
         self.__set_final_foot_position(world_footpos_final)
 
         if self.__is_first_swing:

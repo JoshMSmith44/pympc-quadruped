@@ -241,7 +241,7 @@ def main():
         mujoco_xml_path = os.path.join(cur_path, '../robot/aliengo/aliengo_stairs.xml')
     model = mujoco_py.load_model_from_path(mujoco_xml_path)
     #create_stairs(model, 80, 8)
-    create_inclined_plane(model, 8, 3.6)
+    create_inclined_plane(model, 8, 3.5)
     get_deriv_mat(model)
     sim = mujoco_py.MjSim(model)
     
